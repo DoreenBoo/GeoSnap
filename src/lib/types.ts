@@ -8,4 +8,5 @@ export type Photo = {
   };
   tags: string[];
   dataAiHint?: string;
+  isNew?: boolean;
 };

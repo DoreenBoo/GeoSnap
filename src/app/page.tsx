@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { Photo } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import * as EXIF from 'exif-js';
 
 import MapView from '@/components/map-view';
 import PhotoDialog from '@/components/photo-dialog';
@@ -53,59 +54,91 @@ export default function Home() {
   const [isPhotoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [isMapReady, setMapReady] = useState(false);
   const [hasValidKeys, setHasValidKeys] = useState(false);
+  const [apiKey, setApiKey] = useState('');
 
   useEffect(() => {
     // Trim values to handle potential whitespace issues from copy-pasting
-    const apiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY?.trim();
+    const key = process.env.NEXT_PUBLIC_AMAP_API_KEY?.trim();
     const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE?.trim();
 
-    if (apiKey && apiKey !== 'YOUR_API_KEY_HERE' && securityCode && securityCode !== 'YOUR_SECURITY_CODE_HERE') {
+    if (key && key !== 'YOUR_API_KEY_HERE' && securityCode && securityCode !== 'YOUR_SECURITY_CODE_HERE') {
       setHasValidKeys(true);
+      setApiKey(key);
     } else {
       setHasValidKeys(false);
     }
   }, []);
-
 
   const handleMarkerClick = (photo: Photo) => {
     setSelectedPhoto(photo);
     setPhotoDialogOpen(true);
   };
 
-  const handlePhotoUpload = async (photoDataUri: string, fileName: string) => {
+  const handlePhotoUpload = async (file: File) => {
     setIsUploading(true);
-    try {
-      // For this demo, we'll assign a random location near the last one.
-      const lastLocation = photos.length > 0 ? photos[photos.length - 1].location : { lat: 39.9163, lng: 116.3972 };
-      const newLocation = {
-        lat: lastLocation.lat + (Math.random() - 0.5) * 0.2,
-        lng: lastLocation.lng + (Math.random() - 0.5) * 0.2,
-      };
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (typeof e.target?.result !== 'string') {
+        toast({ variant: 'destructive', title: '文件读取失败' });
+        setIsUploading(false);
+        return;
+      }
+      const photoDataUri = e.target.result;
+      
+      EXIF.getData(file as any, function(this: any) {
+        const lat = EXIF.getTag(this, "GPSLatitude");
+        const lon = EXIF.getTag(this, "GPSLongitude");
 
-      const newPhoto: Photo = {
-        id: new Date().toISOString(),
-        name: fileName,
-        src: photoDataUri,
-        location: newLocation,
-        tags: [],
-      };
-
-      setPhotos(prevPhotos => [...prevPhotos, newPhoto]);
-      setSelectedPhoto(newPhoto);
-      setPhotoDialogOpen(true);
-
-    } catch (error) {
-      console.error('Error processing photo:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Upload Failed',
-        description: 'Could not process the photo. Please try again.',
+        if (lat && lon) {
+          const latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
+          const lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
+          const latitude = (lat[0] + lat[1] / 60 + lat[2] / 3600) * (latRef === "N" ? 1 : -1);
+          const longitude = (lon[0] + lon[1] / 60 + lon[2] / 3600) * (lonRef === "E" ? 1 : -1);
+          
+          fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${apiKey}&location=${longitude},${latitude}`)
+            .then(response => response.json())
+            .then(data => {
+              if (data.status === '1' && data.regeocode) {
+                const newPhoto: Photo = {
+                  id: new Date().toISOString(),
+                  name: data.regeocode.formatted_address || file.name,
+                  src: photoDataUri,
+                  location: { lat: latitude, lng: longitude },
+                  tags: [],
+                  isNew: true,
+                };
+                setSelectedPhoto(newPhoto);
+                setPhotoDialogOpen(true);
+              } else {
+                 throw new Error('逆地理编码失败');
+              }
+            })
+            .catch(error => {
+               console.error('逆地理编码错误:', error);
+               toast({ variant: 'destructive', title: '获取位置信息失败', description: '请稍后重试。' });
+            })
+            .finally(() => setIsUploading(false));
+        } else {
+          toast({ variant: 'destructive', title: '照片中未找到GPS信息' });
+          setIsUploading(false);
+        }
       });
-    } finally {
-      setIsUploading(false);
+    };
+
+    reader.onerror = () => {
+       toast({ variant: 'destructive', title: '文件读取错误', description: '无法读取所选文件。' });
+       setIsUploading(false);
     }
+    reader.readAsDataURL(file);
   };
   
+  const handleSavePhoto = (updatedPhoto: Photo) => {
+    const { isNew, ...photoToSave } = updatedPhoto;
+    setPhotos(prevPhotos => [...prevPhotos, photoToSave]);
+    setPhotoDialogOpen(false);
+    setSelectedPhoto(null);
+  };
+
   return (
     <div className="relative h-screen w-screen overflow-hidden">
       {hasValidKeys ? (
@@ -141,6 +174,7 @@ export default function Home() {
         photo={selectedPhoto}
         open={isPhotoDialogOpen}
         onOpenChange={setPhotoDialogOpen}
+        onSave={handleSavePhoto}
       />
       
       <header className="absolute top-0 left-0 p-4 z-10">

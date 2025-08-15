@@ -6,7 +6,7 @@ import { Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface PhotoUploaderProps {
-  onPhotoUploaded: (photoDataUri: string, fileName: string) => void;
+  onPhotoUploaded: (file: File) => void;
   isUploading: boolean;
 }
 
@@ -24,26 +24,12 @@ const PhotoUploader: FC<PhotoUploaderProps> = ({ onPhotoUploaded, isUploading })
       if (!file.type.startsWith('image/')) {
         toast({
           variant: 'destructive',
-          title: 'Invalid File Type',
-          description: 'Please select an image file.',
+          title: '文件类型无效',
+          description: '请选择一个图片文件。',
         });
         return;
       }
-
-      const reader = new FileReader();
-      reader.onload = e => {
-        if (typeof e.target?.result === 'string') {
-          onPhotoUploaded(e.target.result, file.name);
-        }
-      };
-      reader.onerror = () => {
-         toast({
-          variant: 'destructive',
-          title: 'File Read Error',
-          description: 'Could not read the selected file.',
-        });
-      }
-      reader.readAsDataURL(file);
+      onPhotoUploaded(file);
     }
     // Reset file input to allow uploading the same file again
     event.target.value = '';
@@ -56,7 +42,7 @@ const PhotoUploader: FC<PhotoUploaderProps> = ({ onPhotoUploaded, isUploading })
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        accept="image/*"
+        accept="image/jpeg"
         disabled={isUploading}
       />
       <Button
@@ -72,7 +58,7 @@ const PhotoUploader: FC<PhotoUploaderProps> = ({ onPhotoUploaded, isUploading })
           <Upload />
         )}
         <span className={isUploading ? 'sr-only' : 'ml-2'}>
-          {isUploading ? 'Uploading...' : 'Upload Photo'}
+          {isUploading ? '处理中...' : '上传照片'}
         </span>
       </Button>
     </>
