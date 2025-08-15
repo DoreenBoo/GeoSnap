@@ -110,12 +110,16 @@ export default function Home() {
                 setSelectedPhoto(newPhoto);
                 setPhotoDialogOpen(true);
               } else {
-                 throw new Error('逆地理编码失败');
+                 toast({ 
+                    variant: 'destructive', 
+                    title: '逆地理编码失败', 
+                    description: `无法获取该坐标的位置信息。高德地图返回: ${data.info || '未知错误'}` 
+                  });
               }
             })
             .catch(error => {
-               console.error('逆地理编码错误:', error);
-               toast({ variant: 'destructive', title: '获取位置信息失败', description: '请稍后重试。' });
+               console.error('逆地理编码请求错误:', error);
+               toast({ variant: 'destructive', title: '获取位置信息失败', description: '网络请求失败，请检查您的网络连接或稍后重试。' });
             })
             .finally(() => setIsUploading(false));
         } else {
