@@ -95,7 +95,7 @@ export default function Home() {
           const latitude = (lat[0] + lat[1] / 60 + lat[2] / 3600) * (latRef === "N" ? 1 : -1);
           const longitude = (lon[0] + lon[1] / 60 + lon[2] / 3600) * (lonRef === "E" ? 1 : -1);
           
-          fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${apiKey}&location=${longitude},${latitude}`)
+          fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${apiKey}&location=${longitude},${latitude}&coordsys=gps`)
             .then(response => response.json())
             .then(data => {
               if (data.status === '1' && data.regeocode) {
