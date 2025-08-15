@@ -55,8 +55,10 @@ export default function Home() {
   const [hasValidKeys, setHasValidKeys] = useState(false);
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY;
-    const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE;
+    // Trim values to handle potential whitespace issues from copy-pasting
+    const apiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY?.trim();
+    const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE?.trim();
+
     if (apiKey && apiKey !== 'YOUR_API_KEY_HERE' && securityCode && securityCode !== 'YOUR_SECURITY_CODE_HERE') {
       setHasValidKeys(true);
     } else {
@@ -110,16 +112,19 @@ export default function Home() {
          <MapView photos={photos} onMarkerClick={handleMarkerClick} onMapReady={setMapReady} />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-muted">
-           <Card className="w-2/3 text-center">
+           <Card className="w-2/3 max-w-lg text-center">
              <CardHeader>
               <CardTitle>欢迎来到 GeoSnap!</CardTitle>
              </CardHeader>
              <CardContent>
-              <p className="mb-2">要查看交互式地图，请将您的高德地图 API Key 和安全密钥添加到 <code className="bg-secondary p-1 rounded-md">.env.local</code> 文件中。</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="mb-4">要查看交互式地图，请在项目根目录创建 <code className="bg-secondary p-1 rounded-md">.env.local</code> 文件，并添加您的高德地图 API Key 和安全密钥。</p>
+              <div className="bg-secondary p-4 rounded-md text-left text-sm text-muted-foreground">
+                <pre><code>
                 NEXT_PUBLIC_AMAP_API_KEY=YOUR_API_KEY_HERE<br/>
                 NEXT_PUBLIC_AMAP_SECURITY_CODE=YOUR_SECURITY_CODE_HERE
-              </p>
+                </code></pre>
+              </div>
+               <p className="mt-4 text-sm">添加或修改后，请务必<strong className="text-primary">重启开发服务器</strong> (在终端按 Ctrl+C 然后重新运行 npm run dev)。</p>
              </CardContent>
            </Card>
         </div>

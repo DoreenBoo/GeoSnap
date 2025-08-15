@@ -21,18 +21,15 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
       return;
     }
 
-    const initMap = () => {
-      if (!window.AMap) {
-        console.error('AMap SDK not loaded');
-        toast({
-          variant: 'destructive',
-          title: '地图加载失败',
-          description: '高德地图SDK未能成功加载，请检查网络连接或刷新页面。',
-        });
-        onMapReady(false);
-        return;
+    const checkAmapReady = (callback: () => void) => {
+      if (window.AMap) {
+        callback();
+      } else {
+        setTimeout(() => checkAmapReady(callback), 100);
       }
-      
+    };
+
+    const initMap = () => {
       const center = photos.length > 0 
         ? [photos[0].location.lng, photos[0].location.lat] 
         : [116.3972, 39.9163];
@@ -47,6 +44,15 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
       map.on('complete', () => {
           onMapReady(true);
       });
+      
+      map.on('error', () => {
+        toast({
+          variant: 'destructive',
+          title: '地图加载失败',
+          description: '高德地图实例创建失败，请检查API Key或网络。',
+        });
+        onMapReady(false);
+      });
 
       // Clean up on unmount
       return () => {
@@ -56,16 +62,17 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
       };
     };
 
-    // Use a timeout to wait for the AMap script to load.
-    const timeoutId = setTimeout(initMap, 100);
-
-    return () => clearTimeout(timeoutId);
+    checkAmapReady(() => {
+      if (!mapInstanceRef.current) {
+         initMap();
+      }
+    });
 
   }, []); // Run only once on mount
 
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !window.AMap) return;
+    if (!mapInstanceRef.current || !window.AMap || !onMarkerClick) return;
 
     // Clear existing markers
     mapInstanceRef.current.remove(markersRef.current);
@@ -74,7 +81,7 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
     // Add new markers
     photos.forEach(photo => {
       const marker = new window.AMap.Marker({
-        position: new window.AMAP.LngLat(photo.location.lng, photo.location.lat),
+        position: new window.AMap.LngLat(photo.location.lng, photo.location.lat),
         title: photo.name,
       });
 
@@ -91,6 +98,9 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
     if (photos.length > 0) {
         const lastPhoto = photos[photos.length - 1];
         mapInstanceRef.current.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
+        if (mapInstanceRef.current.getZoom() < 5) {
+            mapInstanceRef.current.setZoom(5);
+        }
     }
 
   }, [photos, onMarkerClick]);
