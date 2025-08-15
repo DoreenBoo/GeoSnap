@@ -1,5 +1,3 @@
-# Firebase Studio
+# GeoSnap
 
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+This is a Next.js application created with Firebase Studio. It allows you to upload photos and view them on a map based on their GPS data.
