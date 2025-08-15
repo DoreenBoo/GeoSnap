@@ -11,40 +11,7 @@ import PhotoUploader from '@/components/photo-uploader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Camera } from 'lucide-react';
 
-const initialPhotos: Photo[] = [
-  {
-    id: '1',
-    name: '故宫博物院',
-    src: 'https://placehold.co/800x600.png',
-    dataAiHint: 'forbidden city',
-    location: { lat: 39.9163, lng: 116.3972 },
-    tags: ['beijing', 'palace', 'history', 'landmark'],
-  },
-  {
-    id: '2',
-    name: '东方明珠',
-    src: 'https://placehold.co/800x600.png',
-    dataAiHint: 'oriental pearl tower',
-    location: { lat: 31.2397, lng: 121.4998 },
-    tags: ['shanghai', 'tower', 'landmark', 'modern'],
-  },
-  {
-    id: '3',
-    name: '兵马俑',
-    src: 'https://placehold.co/800x600.png',
-    dataAiHint: 'terracotta army',
-    location: { lat: 34.3853, lng: 109.2792 },
-    tags: ['xi\'an', 'history', 'sculpture', 'tomb'],
-  },
-  {
-    id: '4',
-    name: '维多利亚港',
-    src: 'https://placehold.co/800x600.png',
-    dataAiHint: 'victoria harbour',
-    location: { lat: 22.284, lng: 114.1655 },
-    tags: ['hong kong', 'harbor', 'skyline', 'cityscape'],
-  },
-];
+const initialPhotos: Photo[] = [];
 
 export default function Home() {
   const { toast } = useToast();
