@@ -6,11 +6,11 @@ import { Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface PhotoUploaderProps {
-  onPhotoUploaded: (file: File) => void;
+  onPhotosUploaded: (files: FileList) => void;
   isUploading: boolean;
 }
 
-const PhotoUploader: FC<PhotoUploaderProps> = ({ onPhotoUploaded, isUploading }) => {
+const PhotoUploader: FC<PhotoUploaderProps> = ({ onPhotosUploaded, isUploading }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -19,19 +19,23 @@ const PhotoUploader: FC<PhotoUploaderProps> = ({ onPhotoUploaded, isUploading })
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast({
-          variant: 'destructive',
-          title: '文件类型无效',
-          description: '请选择一个图片文件。',
-        });
-        return;
+    const files = event.target.files;
+    if (files && files.length > 0) {
+       for (let i = 0; i < files.length; i++) {
+        if (!files[i].type.startsWith('image/')) {
+          toast({
+            variant: 'destructive',
+            title: '文件类型无效',
+            description: `文件 "${files[i].name}" 不是一个图片文件。`,
+          });
+          // Reset file input to prevent re-uploading the same invalid set
+          event.target.value = '';
+          return;
+        }
       }
-      onPhotoUploaded(file);
+      onPhotosUploaded(files);
     }
-    // Reset file input to allow uploading the same file again
+    // Reset file input to allow uploading the same file(s) again
     event.target.value = '';
   };
 
@@ -42,15 +46,16 @@ const PhotoUploader: FC<PhotoUploaderProps> = ({ onPhotoUploaded, isUploading })
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
-        accept="image/jpeg"
+        accept="image/jpeg,image/png"
         disabled={isUploading}
+        multiple // Allow multiple file selection
       />
       <Button
         size="lg"
         className="rounded-full shadow-lg"
         onClick={handleButtonClick}
         disabled={isUploading}
-        aria-label="Upload Photo"
+        aria-label="Upload Photos"
       >
         {isUploading ? (
           <Loader2 className="animate-spin" />

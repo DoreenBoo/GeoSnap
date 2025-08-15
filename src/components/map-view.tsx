@@ -22,7 +22,7 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
     }
 
     const checkAmapReady = (callback: () => void) => {
-      if (window.AMap) {
+      if (window.AMap && window.AMap.Map) {
         callback();
       } else {
         setTimeout(() => checkAmapReady(callback), 100);
@@ -80,8 +80,39 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
 
     // Add new markers
     photos.forEach(photo => {
+      const markerContent = `
+        <div style="
+          position: relative;
+          width: 50px;
+          height: 50px;
+          background: white;
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          cursor: pointer;
+        ">
+          <img 
+            src="${photo.src}" 
+            alt="${photo.name}" 
+            style="
+              width: 44px; 
+              height: 44px; 
+              border-radius: 50%; 
+              object-fit: cover; 
+              transform: rotate(45deg);
+              pointer-events: none;
+            " 
+          />
+        </div>
+      `;
+      
       const marker = new window.AMap.Marker({
         position: new window.AMap.LngLat(photo.location.lng, photo.location.lat),
+        content: markerContent,
+        offset: new window.AMap.Pixel(-25, -50), // Adjust offset to make the tip point to the location
         title: photo.name,
       });
 
@@ -97,9 +128,11 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
 
     if (photos.length > 0) {
         const lastPhoto = photos[photos.length - 1];
-        mapInstanceRef.current.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
-        if (mapInstanceRef.current.getZoom() < 5) {
-            mapInstanceRef.current.setZoom(5);
+        if (lastPhoto.isNew) { // Only center on newly added photos
+          mapInstanceRef.current.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
+           if (mapInstanceRef.current.getZoom() < 12) {
+             mapInstanceRef.current.setZoom(12);
+           }
         }
     }
 

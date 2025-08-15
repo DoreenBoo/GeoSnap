@@ -46,84 +46,101 @@ export default function Home() {
     setPhotoDialogOpen(true);
   };
 
-  const handlePhotoUpload = async (file: File) => {
-    if (!webServiceApiKey) {
-       toast({ variant: 'destructive', title: '配置不完整', description: 'Web服务API Key未设置，无法进行逆地理编码。' });
-       return;
-    }
-
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (typeof e.target?.result !== 'string') {
-        toast({ variant: 'destructive', title: '文件读取失败' });
-        setIsUploading(false);
+  const processFile = (file: File): Promise<Photo | null> => {
+    return new Promise((resolve) => {
+      if (!webServiceApiKey) {
+        toast({ variant: 'destructive', title: '配置不完整', description: 'Web服务API Key未设置，无法进行逆地理编码。' });
+        resolve(null);
         return;
       }
-      const photoDataUri = e.target.result;
-      
-      EXIF.getData(file as any, function(this: any) {
-        const lat = EXIF.getTag(this, "GPSLatitude");
-        const lon = EXIF.getTag(this, "GPSLongitude");
-
-        if (lat && lon) {
-          const latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
-          const lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
-          const latitude = (lat[0] + lat[1] / 60 + lat[2] / 3600) * (latRef === "N" ? 1 : -1);
-          const longitude = (lon[0] + lon[1] / 60 + lon[2] / 3600) * (lonRef === "E" ? 1 : -1);
-          
-          fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${webServiceApiKey}&location=${longitude},${latitude}&coordsys=gps`)
-            .then(response => response.json())
-            .then(data => {
-              if (data.status === '1' && data.regeocode) {
-                const newPhoto: Photo = {
-                  id: new Date().toISOString(),
-                  name: data.regeocode.formatted_address || file.name,
-                  src: photoDataUri,
-                  location: { lat: latitude, lng: longitude },
-                  tags: [],
-                  isNew: true,
-                };
-                setPhotos(prevPhotos => [...prevPhotos, newPhoto]);
-                setSelectedPhoto(newPhoto);
-                setPhotoDialogOpen(true);
-              } else {
-                 toast({ 
-                    variant: 'destructive', 
-                    title: '逆地理编码失败', 
-                    description: `无法获取该坐标的位置信息。高德地图返回: ${data.info || '未知错误'}` 
-                  });
-              }
-            })
-            .catch(error => {
-               console.error('逆地理编码请求错误:', error);
-               toast({ variant: 'destructive', title: '获取位置信息失败', description: '网络请求失败，请检查您的网络连接或稍后重试。' });
-            })
-            .finally(() => setIsUploading(false));
-        } else {
-          toast({ variant: 'destructive', title: '照片中未找到GPS信息' });
-          setIsUploading(false);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (typeof e.target?.result !== 'string') {
+          toast({ variant: 'destructive', title: '文件读取失败', description: `无法读取文件: ${file.name}` });
+          resolve(null);
+          return;
         }
-      });
-    };
+        const photoDataUri = e.target.result;
+        
+        EXIF.getData(file as any, function(this: any) {
+          const lat = EXIF.getTag(this, "GPSLatitude");
+          const lon = EXIF.getTag(this, "GPSLongitude");
 
-    reader.onerror = () => {
-       toast({ variant: 'destructive', title: '文件读取错误', description: '无法读取所选文件。' });
-       setIsUploading(false);
+          if (lat && lon) {
+            const latRef = EXIF.getTag(this, "GPSLatitudeRef") || "N";
+            const lonRef = EXIF.getTag(this, "GPSLongitudeRef") || "E";
+            const latitude = (lat[0] + lat[1] / 60 + lat[2] / 3600) * (latRef === "N" ? 1 : -1);
+            const longitude = (lon[0] + lon[1] / 60 + lon[2] / 3600) * (lonRef === "E" ? 1 : -1);
+            
+            fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${webServiceApiKey}&location=${longitude},${latitude}&coordsys=gps`)
+              .then(response => response.json())
+              .then(data => {
+                if (data.status === '1' && data.regeocode) {
+                  const newPhoto: Photo = {
+                    id: `${new Date().toISOString()}-${file.name}`,
+                    name: data.regeocode.formatted_address || file.name,
+                    src: photoDataUri,
+                    location: { lat: latitude, lng: longitude },
+                    tags: [],
+                    isNew: true,
+                  };
+                  resolve(newPhoto);
+                } else {
+                   toast({ 
+                      variant: 'destructive', 
+                      title: '逆地理编码失败', 
+                      description: `照片 "${file.name}" 无法获取位置。高德地图: ${data.info || '未知错误'}` 
+                    });
+                   resolve(null);
+                }
+              })
+              .catch(error => {
+                 console.error('逆地理编码请求错误:', error);
+                 toast({ variant: 'destructive', title: '获取位置信息失败', description: '网络请求失败，请检查您的网络连接。' });
+                 resolve(null);
+              });
+          } else {
+            toast({ variant: 'destructive', title: '缺少GPS信息', description: `照片 "${file.name}" 中未找到GPS数据。` });
+            resolve(null);
+          }
+        });
+      };
+      reader.onerror = () => {
+         toast({ variant: 'destructive', title: '文件读取错误', description: `无法读取所选文件: ${file.name}` });
+         resolve(null);
+      }
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotosUpload = async (files: FileList) => {
+    setIsUploading(true);
+    const newPhotosPromises = Array.from(files).map(processFile);
+    const newPhotos = (await Promise.all(newPhotosPromises)).filter(p => p !== null) as Photo[];
+
+    if (newPhotos.length > 0) {
+      setPhotos(prevPhotos => {
+        const photosWithClearedNewFlag = prevPhotos.map(p => p.isNew ? {...p, isNew: false} : p);
+        return [...photosWithClearedNewFlag, ...newPhotos];
+      });
+      setSelectedPhoto(newPhotos[0]);
+      setPhotoDialogOpen(true);
     }
-    reader.readAsDataURL(file);
+    
+    setIsUploading(false);
   };
   
   const handleSavePhoto = (updatedPhoto: Photo) => {
-    const existingPhotoIndex = photos.findIndex(p => p.id === updatedPhoto.id);
-    if (existingPhotoIndex !== -1) {
-        setPhotos(prevPhotos => {
-            const newPhotos = [...prevPhotos];
+    setPhotos(prevPhotos => {
+        return prevPhotos.map(p => {
+          if (p.id === updatedPhoto.id) {
             const { isNew, ...photoToSave } = updatedPhoto;
-            newPhotos[existingPhotoIndex] = photoToSave;
-            return newPhotos;
+            return photoToSave;
+          }
+          // Also clear 'isNew' flag from any other photos
+          return p.isNew ? { ...p, isNew: false } : p;
         });
-    }
+    });
     setPhotoDialogOpen(false);
     setSelectedPhoto(null);
   };
@@ -162,7 +179,7 @@ NEXT_PUBLIC_AMAP_WEBSERVICE_API_KEY=YOUR_WEBSERVICE_API_KEY_HERE
 
       {isMapReady && (
          <div className="absolute bottom-6 right-6 z-10">
-          <PhotoUploader onPhotoUploaded={handlePhotoUpload} isUploading={isUploading} />
+          <PhotoUploader onPhotosUploaded={handlePhotosUpload} isUploading={isUploading} />
         </div>
       )}
 
