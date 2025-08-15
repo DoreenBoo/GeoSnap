@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Photo } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -13,35 +13,35 @@ import { Camera } from 'lucide-react';
 const initialPhotos: Photo[] = [
   {
     id: '1',
-    name: 'Eiffel Tower',
+    name: '故宫博物院',
     src: 'https://placehold.co/800x600.png',
-    dataAiHint: 'eiffel tower',
-    location: { lat: 48.8584, lng: 2.2945 },
-    tags: ['paris', 'architecture', 'tower', 'landmark'],
+    dataAiHint: 'forbidden city',
+    location: { lat: 39.9163, lng: 116.3972 },
+    tags: ['beijing', 'palace', 'history', 'landmark'],
   },
   {
     id: '2',
-    name: 'Colosseum',
+    name: '东方明珠',
     src: 'https://placehold.co/800x600.png',
-    dataAiHint: 'colosseum rome',
-    location: { lat: 41.8902, lng: 12.4922 },
-    tags: ['rome', 'history', 'ruins', 'amphitheater'],
+    dataAiHint: 'oriental pearl tower',
+    location: { lat: 31.2397, lng: 121.4998 },
+    tags: ['shanghai', 'tower', 'landmark', 'modern'],
   },
   {
     id: '3',
-    name: 'Statue of Liberty',
+    name: '兵马俑',
     src: 'https://placehold.co/800x600.png',
-    dataAiHint: 'statue liberty',
-    location: { lat: 40.6892, lng: -74.0445 },
-    tags: ['new york', 'landmark', 'statue', 'usa'],
+    dataAiHint: 'terracotta army',
+    location: { lat: 34.3853, lng: 109.2792 },
+    tags: ['xi\'an', 'history', 'sculpture', 'tomb'],
   },
   {
     id: '4',
-    name: 'Golden Gate Bridge',
+    name: '维多利亚港',
     src: 'https://placehold.co/800x600.png',
-    dataAiHint: 'golden gate',
-    location: { lat: 37.8199, lng: -122.4783 },
-    tags: ['san francisco', 'bridge', 'engineering', 'ocean'],
+    dataAiHint: 'victoria harbour',
+    location: { lat: 22.284, lng: 114.1655 },
+    tags: ['hong kong', 'harbor', 'skyline', 'cityscape'],
   },
 ];
 
@@ -51,6 +51,7 @@ export default function Home() {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isPhotoDialogOpen, setPhotoDialogOpen] = useState(false);
+  const [isMapReady, setMapReady] = useState(false);
 
   const handleMarkerClick = (photo: Photo) => {
     setSelectedPhoto(photo);
@@ -60,12 +61,11 @@ export default function Home() {
   const handlePhotoUpload = async (photoDataUri: string, fileName: string) => {
     setIsUploading(true);
     try {
-      // Simulate extracting GPS data from EXIF (or manual addition)
       // For this demo, we'll assign a random location near the last one.
-      const lastLocation = photos.length > 0 ? photos[photos.length - 1].location : { lat: 34.0522, lng: -118.2437 };
+      const lastLocation = photos.length > 0 ? photos[photos.length - 1].location : { lat: 39.9163, lng: 116.3972 };
       const newLocation = {
-        lat: lastLocation.lat + (Math.random() - 0.5) * 0.1,
-        lng: lastLocation.lng + (Math.random() - 0.5) * 0.1,
+        lat: lastLocation.lat + (Math.random() - 0.5) * 0.2,
+        lng: lastLocation.lng + (Math.random() - 0.5) * 0.2,
       };
 
       const newPhoto: Photo = {
@@ -92,28 +92,36 @@ export default function Home() {
     }
   };
   
-  const hasApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY !== "YOUR_API_KEY_HERE";
+  const hasApiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY && process.env.NEXT_PUBLIC_AMAP_API_KEY !== "YOUR_API_KEY_HERE";
+  const hasSecurityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE && process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE !== "YOUR_SECURITY_CODE_HERE";
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      {hasApiKey ? (
-         <MapView photos={photos} onMarkerClick={handleMarkerClick} />
+      {hasApiKey && hasSecurityCode ? (
+         <MapView photos={photos} onMarkerClick={handleMarkerClick} onMapReady={setMapReady} />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-muted">
-           <Card className="w-1/3 text-center">
+           <Card className="w-2/3 text-center">
              <CardHeader>
-              <CardTitle>Welcome to GeoSnap!</CardTitle>
+              <CardTitle>欢迎来到 GeoSnap!</CardTitle>
              </CardHeader>
              <CardContent>
-              <p>To see the interactive map, please add your Google Maps API key to a <code className="bg-secondary p-1 rounded-md">.env.local</code> file.</p>
+              <p className="mb-2">要查看交互式地图，请将您的高德地图 API Key 和安全密钥添加到 <code className="bg-secondary p-1 rounded-md">.env.local</code> 文件中。</p>
+              <p className="text-sm text-muted-foreground">
+                NEXT_PUBLIC_AMAP_API_KEY=YOUR_API_KEY_HERE<br/>
+                NEXT_PUBLIC_AMAP_SECURITY_CODE=YOUR_SECURITY_CODE_HERE
+              </p>
              </CardContent>
            </Card>
         </div>
       )}
 
-      <div className="absolute bottom-6 right-6 z-10">
-        <PhotoUploader onPhotoUploaded={handlePhotoUpload} isUploading={isUploading} />
-      </div>
+      {isMapReady && (
+         <div className="absolute bottom-6 right-6 z-10">
+          <PhotoUploader onPhotoUploaded={handlePhotoUpload} isUploading={isUploading} />
+        </div>
+      )}
+
 
       <PhotoDialog
         photo={selectedPhoto}

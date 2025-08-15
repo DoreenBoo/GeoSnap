@@ -1,61 +1,102 @@
 'use client';
 
-import type { FC } from 'react';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { useEffect, useRef } from 'react';
 import type { Photo } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface MapViewProps {
   photos: Photo[];
   onMarkerClick: (photo: Photo) => void;
+  onMapReady: (isReady: boolean) => void;
 }
 
-const mapStyles = [
-  {
-    featureType: 'poi',
-    elementType: 'labels',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'labels.icon',
-    stylers: [{ visibility: 'off' }],
-  },
-];
+const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersRef = useRef<any[]>([]);
+  const { toast } = useToast();
 
-const MapView: FC<MapViewProps> = ({ photos, onMarkerClick }) => {
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  useEffect(() => {
+    if (typeof window === 'undefined' || !mapRef.current) {
+      return;
+    }
 
-  if (!apiKey) {
-    return <div>API key for Google Maps is not configured.</div>;
-  }
-  
-  const center = photos.length > 0 ? photos[0].location : { lat: 48.8584, lng: 2.2945 };
+    const initMap = () => {
+      if (!window.AMap) {
+        console.error('AMap SDK not loaded');
+        toast({
+          variant: 'destructive',
+          title: '地图加载失败',
+          description: '高德地图SDK未能成功加载，请检查网络连接或刷新页面。',
+        });
+        onMapReady(false);
+        return;
+      }
+      
+      const center = photos.length > 0 
+        ? [photos[0].location.lng, photos[0].location.lat] 
+        : [116.3972, 39.9163];
 
-  return (
-    <APIProvider apiKey={apiKey}>
-      <Map
-        defaultCenter={center}
-        defaultZoom={3}
-        gestureHandling={'greedy'}
-        disableDefaultUI={true}
-        mapId={'a2b3c4d5e6f7g8h9'}
-        styles={mapStyles}
-        className="w-full h-full"
-      >
-        {photos.map(photo => (
-          <AdvancedMarker
-            key={photo.id}
-            position={photo.location}
-            onClick={() => onMarkerClick(photo)}
-          >
-            <div className="w-8 h-8 rounded-full bg-background border-2 border-primary flex items-center justify-center cursor-pointer transition-transform hover:scale-110 shadow-lg">
-                <div className="w-5 h-5 bg-primary rounded-full"></div>
-            </div>
-          </AdvancedMarker>
-        ))}
-      </Map>
-    </APIProvider>
-  );
+      const map = new window.AMap.Map(mapRef.current!, {
+        zoom: 5,
+        center: center,
+        viewMode: '2D',
+      });
+      mapInstanceRef.current = map;
+
+      map.on('complete', () => {
+          onMapReady(true);
+      });
+
+      // Clean up on unmount
+      return () => {
+        if (map) {
+          map.destroy();
+        }
+      };
+    };
+
+    // Use a timeout to wait for the AMap script to load.
+    const timeoutId = setTimeout(initMap, 100);
+
+    return () => clearTimeout(timeoutId);
+
+  }, []); // Run only once on mount
+
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.AMap) return;
+
+    // Clear existing markers
+    mapInstanceRef.current.remove(markersRef.current);
+    markersRef.current = [];
+
+    // Add new markers
+    photos.forEach(photo => {
+      const marker = new window.AMap.Marker({
+        position: new window.AMAP.LngLat(photo.location.lng, photo.location.lat),
+        title: photo.name,
+      });
+
+      marker.on('click', () => {
+        onMarkerClick(photo);
+        mapInstanceRef.current.setCenter([photo.location.lng, photo.location.lat]);
+      });
+
+      markersRef.current.push(marker);
+    });
+    
+    mapInstanceRef.current.add(markersRef.current);
+
+    if (photos.length > 0) {
+        const lastPhoto = photos[photos.length - 1];
+        mapInstanceRef.current.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
+    }
+
+  }, [photos, onMarkerClick]);
+
+
+  return <div ref={mapRef} className="w-full h-full" />;
 };
 
 export default MapView;
