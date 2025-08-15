@@ -52,6 +52,18 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [isPhotoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [isMapReady, setMapReady] = useState(false);
+  const [hasValidKeys, setHasValidKeys] = useState(false);
+
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY;
+    const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE;
+    if (apiKey && apiKey !== 'YOUR_API_KEY_HERE' && securityCode && securityCode !== 'YOUR_SECURITY_CODE_HERE') {
+      setHasValidKeys(true);
+    } else {
+      setHasValidKeys(false);
+    }
+  }, []);
+
 
   const handleMarkerClick = (photo: Photo) => {
     setSelectedPhoto(photo);
@@ -92,12 +104,9 @@ export default function Home() {
     }
   };
   
-  const hasApiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY && process.env.NEXT_PUBLIC_AMAP_API_KEY !== "YOUR_API_KEY_HERE";
-  const hasSecurityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE && process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE !== "YOUR_SECURITY_CODE_HERE";
-
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      {hasApiKey && hasSecurityCode ? (
+      {hasValidKeys ? (
          <MapView photos={photos} onMarkerClick={handleMarkerClick} onMapReady={setMapReady} />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-muted">
