@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import type { Photo } from '@/lib/types';
-import { suggestPhotoTags } from '@/ai/flows/suggest-photo-tags';
 import { useToast } from '@/hooks/use-toast';
 
 import MapView from '@/components/map-view';
@@ -69,15 +68,12 @@ export default function Home() {
         lng: lastLocation.lng + (Math.random() - 0.5) * 0.1,
       };
 
-      // Get AI-suggested tags
-      const result = await suggestPhotoTags({ photoDataUri });
-
       const newPhoto: Photo = {
         id: new Date().toISOString(),
         name: fileName,
         src: photoDataUri,
         location: newLocation,
-        tags: result.tags,
+        tags: [],
       };
 
       setPhotos(prevPhotos => [...prevPhotos, newPhoto]);
@@ -89,7 +85,7 @@ export default function Home() {
       toast({
         variant: 'destructive',
         title: 'Upload Failed',
-        description: 'Could not get tags for the photo. Please try again.',
+        description: 'Could not process the photo. Please try again.',
       });
     } finally {
       setIsUploading(false);
