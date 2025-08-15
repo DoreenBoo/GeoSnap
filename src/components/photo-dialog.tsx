@@ -40,37 +40,40 @@ const PhotoDialog: FC<PhotoDialogProps> = ({ photo, open, onOpenChange, onSave }
       onSave({ ...photo, name });
     }
   };
+  
+  const handleOpenChange = (isOpen: boolean) => {
+    if (photo.isNew && !isOpen && onSave) {
+      // If it's a new photo, 'closing' it means saving it.
+      handleSave();
+    } else {
+      onOpenChange(isOpen);
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-      // Prevent closing when it's a new photo that hasn't been saved
-      if (photo.isNew && !isOpen) return;
-      onOpenChange(isOpen);
-    }}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
            {photo.isNew ? (
-            <DialogTitle>确认照片位置</DialogTitle>
+            <DialogTitle>新照片</DialogTitle>
           ) : (
             <DialogTitle className="truncate">{photo.name}</DialogTitle>
           )}
            <DialogDescription>
-            {`Lat: ${photo.location.lat.toFixed(4)}, Lng: ${photo.location.lng.toFixed(4)}`}
+            {`纬度: ${photo.location.lat.toFixed(4)}, 经度: ${photo.location.lng.toFixed(4)}`}
           </DialogDescription>
         </DialogHeader>
 
-        {photo.isNew ? (
-            <div className="grid gap-2 mt-2">
-                <label htmlFor="photo-name" className="text-sm font-medium">位置名称</label>
-                <Input
-                    id="photo-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="例如：北京市天安门广场"
-                />
-            </div>
-        ) : null}
-
+        <div className="grid gap-2 mt-2">
+            <label htmlFor="photo-name" className="text-sm font-medium">位置名称</label>
+            <Input
+                id="photo-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="例如：北京市天安门广场"
+            />
+        </div>
+     
         <div className="relative w-full aspect-video rounded-lg overflow-hidden my-4">
           <Image
             src={photo.src}
@@ -95,9 +98,11 @@ const PhotoDialog: FC<PhotoDialogProps> = ({ photo, open, onOpenChange, onSave }
           </div>
         )}
         
-        {photo.isNew && onSave && (
+        {onSave && (
           <DialogFooter>
-            <Button onClick={handleSave}>添加到地图</Button>
+            <Button onClick={handleSave}>
+              {photo.isNew ? '添加到地图' : '更新信息'}
+            </Button>
           </DialogFooter>
         )}
       </DialogContent>

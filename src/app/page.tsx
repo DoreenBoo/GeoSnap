@@ -54,16 +54,21 @@ export default function Home() {
   const [isPhotoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [isMapReady, setMapReady] = useState(false);
   const [hasValidKeys, setHasValidKeys] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [webServiceApiKey, setWebServiceApiKey] = useState('');
 
   useEffect(() => {
     // Trim values to handle potential whitespace issues from copy-pasting
-    const key = process.env.NEXT_PUBLIC_AMAP_API_KEY?.trim();
+    const jsApiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY?.trim();
     const securityCode = process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE?.trim();
+    const wsApiKey = process.env.NEXT_PUBLIC_AMAP_WEBSERVICE_API_KEY?.trim();
 
-    if (key && key !== 'YOUR_API_KEY_HERE' && securityCode && securityCode !== 'YOUR_SECURITY_CODE_HERE') {
+    if (
+      jsApiKey && jsApiKey !== 'YOUR_JS_API_KEY_HERE' &&
+      securityCode && securityCode !== 'YOUR_SECURITY_CODE_HERE' &&
+      wsApiKey && wsApiKey !== 'YOUR_WEBSERVICE_API_KEY_HERE'
+    ) {
       setHasValidKeys(true);
-      setApiKey(key);
+      setWebServiceApiKey(wsApiKey);
     } else {
       setHasValidKeys(false);
     }
@@ -75,6 +80,11 @@ export default function Home() {
   };
 
   const handlePhotoUpload = async (file: File) => {
+    if (!webServiceApiKey) {
+       toast({ variant: 'destructive', title: '配置不完整', description: 'Web服务API Key未设置，无法进行逆地理编码。' });
+       return;
+    }
+
     setIsUploading(true);
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -95,7 +105,7 @@ export default function Home() {
           const latitude = (lat[0] + lat[1] / 60 + lat[2] / 3600) * (latRef === "N" ? 1 : -1);
           const longitude = (lon[0] + lon[1] / 60 + lon[2] / 3600) * (lonRef === "E" ? 1 : -1);
           
-          fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${apiKey}&location=${longitude},${latitude}&coordsys=gps`)
+          fetch(`https://restapi.amap.com/v3/geocode/regeo?key=${webServiceApiKey}&location=${longitude},${latitude}&coordsys=gps`)
             .then(response => response.json())
             .then(data => {
               if (data.status === '1' && data.regeocode) {
@@ -107,6 +117,7 @@ export default function Home() {
                   tags: [],
                   isNew: true,
                 };
+                setPhotos(prevPhotos => [...prevPhotos, newPhoto]);
                 setSelectedPhoto(newPhoto);
                 setPhotoDialogOpen(true);
               } else {
@@ -137,11 +148,19 @@ export default function Home() {
   };
   
   const handleSavePhoto = (updatedPhoto: Photo) => {
-    const { isNew, ...photoToSave } = updatedPhoto;
-    setPhotos(prevPhotos => [...prevPhotos, photoToSave]);
+    const existingPhotoIndex = photos.findIndex(p => p.id === updatedPhoto.id);
+    if (existingPhotoIndex !== -1) {
+        setPhotos(prevPhotos => {
+            const newPhotos = [...prevPhotos];
+            const { isNew, ...photoToSave } = updatedPhoto;
+            newPhotos[existingPhotoIndex] = photoToSave;
+            return newPhotos;
+        });
+    }
     setPhotoDialogOpen(false);
     setSelectedPhoto(null);
   };
+
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
@@ -149,19 +168,26 @@ export default function Home() {
          <MapView photos={photos} onMarkerClick={handleMarkerClick} onMapReady={setMapReady} />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-muted">
-           <Card className="w-2/3 max-w-lg text-center">
+           <Card className="w-2/3 max-w-2xl text-center">
              <CardHeader>
               <CardTitle>欢迎来到 GeoSnap!</CardTitle>
              </CardHeader>
              <CardContent>
-              <p className="mb-4">要查看交互式地图，请在项目根目录创建 <code className="bg-secondary p-1 rounded-md">.env.local</code> 文件，并添加您的高德地图 API Key 和安全密钥。</p>
+              <p className="mb-4">要使用本应用，请在项目根目录创建 <code className="bg-secondary p-1 rounded-md">.env.local</code> 文件，并添加您的高德地图 **JS API Key** 和 **Web服务 API Key**。</p>
               <div className="bg-secondary p-4 rounded-md text-left text-sm text-muted-foreground">
-                <pre><code>
-                NEXT_PUBLIC_AMAP_API_KEY=YOUR_API_KEY_HERE<br/>
-                NEXT_PUBLIC_AMAP_SECURITY_CODE=YOUR_SECURITY_CODE_HERE
+                <pre><code className="whitespace-pre-wrap">
+                {`# 用于加载地图 (服务平台: Web端 JS API)
+NEXT_PUBLIC_AMAP_API_KEY=YOUR_JS_API_KEY_HERE
+
+# 用于JS API的安全密钥
+NEXT_PUBLIC_AMAP_SECURITY_CODE=YOUR_SECURITY_CODE_HERE
+
+# 用于逆地理编码 (服务平台: Web服务)
+NEXT_PUBLIC_AMAP_WEBSERVICE_API_KEY=YOUR_WEBSERVICE_API_KEY_HERE
+`}
                 </code></pre>
               </div>
-               <p className="mt-4 text-sm">添加或修改后，请务必<strong className="text-primary">重启开发服务器</strong> (在终端按 Ctrl+C 然后重新运行 npm run dev)。</p>
+               <p className="mt-4 text-sm">您需要到高德开放平台为您的应用分别创建这两种类型的Key。添加或修改后，请务必<strong className="text-primary">重启开发服务器</strong>。</p>
              </CardContent>
            </Card>
         </div>
