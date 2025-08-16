@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -17,11 +18,15 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !mapRef.current) {
-      return;
+    if (mapInstanceRef.current) {
+      return; // Map already initialized
     }
-
+    
+    let isCancelled = false;
+    
     const checkAmapReady = (callback: () => void) => {
+      if(isCancelled) return;
+      
       if (window.AMap && window.AMap.Map) {
         callback();
       } else {
@@ -30,45 +35,61 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
     };
 
     const initMap = () => {
-      const center = photos.length > 0 
-        ? [photos[0].location.lng, photos[0].location.lat] 
-        : [116.3972, 39.9163];
-
-      const map = new window.AMap.Map(mapRef.current!, {
-        zoom: 5,
-        center: center,
-        viewMode: '2D',
-      });
-      mapInstanceRef.current = map;
-
-      map.on('complete', () => {
-          onMapReady(true);
-      });
-      
-      map.on('error', () => {
-        toast({
-          variant: 'destructive',
-          title: '地图加载失败',
-          description: '高德地图实例创建失败，请检查API Key或网络。',
-        });
+      if (!mapRef.current) {
+        console.error("Map container is not available.");
         onMapReady(false);
-      });
+        return;
+      }
+      
+      const center = [116.3972, 39.9163];
 
-      // Clean up on unmount
-      return () => {
-        if (map) {
-          map.destroy();
+      try {
+        const map = new window.AMap.Map(mapRef.current, {
+          zoom: 5,
+          center: center,
+          viewMode: '2D',
+        });
+        mapInstanceRef.current = map;
+
+        map.on('complete', () => {
+          if (!isCancelled) {
+            onMapReady(true);
+          }
+        });
+        
+        map.on('error', () => {
+          if (!isCancelled) {
+            toast({
+              variant: 'destructive',
+              title: '地图加载失败',
+              description: '高德地图实例创建失败，请检查API Key或网络。',
+            });
+            onMapReady(false);
+          }
+        });
+      } catch (e) {
+        console.error("Failed to initialize AMap:", e);
+        if (!isCancelled) {
+          toast({
+              variant: 'destructive',
+              title: '地图初始化错误',
+              description: '无法初始化地图组件，请检查浏览器控制台获取更多信息。',
+            });
+          onMapReady(false);
         }
-      };
+      }
     };
 
-    checkAmapReady(() => {
-      if (!mapInstanceRef.current) {
-         initMap();
+    checkAmapReady(initMap);
+    
+    return () => {
+      isCancelled = true;
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.destroy();
+        mapInstanceRef.current = null;
       }
-    });
-
-  }, []); // Run only once on mount
+    };
+  }, [onMapReady, toast]); // Run only once on mount
 
 
   useEffect(() => {
@@ -133,6 +154,9 @@ const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
            if (mapInstanceRef.current.getZoom() < 12) {
              mapInstanceRef.current.setZoom(12);
            }
+        } else if (photos.length === 1) { // Center on the first photo if it's not new
+            mapInstanceRef.current.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
+            mapInstanceRef.current.setZoom(12);
         }
     }
 

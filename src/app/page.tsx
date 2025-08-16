@@ -12,11 +12,9 @@ import PhotoUploader from '@/components/photo-uploader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Camera } from 'lucide-react';
 
-const initialPhotos: Photo[] = [];
-
 export default function Home() {
   const { toast } = useToast();
-  const [photos, setPhotos] = useState<Photo[]>(initialPhotos);
+  const [photos, setPhotos] = useState<Photo[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isPhotoDialogOpen, setPhotoDialogOpen] = useState(false);
@@ -146,7 +144,6 @@ export default function Home() {
           <PhotoUploader onPhotosUploaded={handlePhotosUpload} isUploading={isUploading} />
         </div>
       )}
-
 
       <PhotoDialog
         photo={selectedPhoto}
