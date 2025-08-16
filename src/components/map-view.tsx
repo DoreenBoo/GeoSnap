@@ -67,16 +67,24 @@ const MapView = ({ photos, onMarkerClick }: MapViewProps) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [mapInstance, setMapInstance] = useState<any>(null);
-  const [isApiLoading, setIsApiLoading] = useState(true);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY;
     if (!apiKey) {
       toast({ variant: 'destructive', title: '配置缺失', description: '高德地图API Key未设置' });
-      setIsApiLoading(false);
       return;
     }
 
+    // Since the script is loaded globally in layout.tsx, we can check for window.AMap
+    // If it's not there, we can wait a bit.
+    const checkAMap = () => {
+      if (window.AMap && window.AMap.Map) {
+        initializeMap();
+      } else {
+        setTimeout(checkAMap, 100); // Check again shortly
+      }
+    }
+    
     const initializeMap = () => {
       if (mapContainerRef.current && !mapRef.current) {
         const map = new window.AMap.Map(mapContainerRef.current, {
@@ -90,40 +98,15 @@ const MapView = ({ photos, onMarkerClick }: MapViewProps) => {
         setMapInstance(map);
       }
     };
-
-    if (window.AMap) {
-      setIsApiLoading(false);
-      initializeMap();
-    } else {
-      const script = document.createElement('script');
-      script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
-      script.async = true;
-      
-      script.onload = () => {
-        setIsApiLoading(false);
-        // At this point, window.AMap is guaranteed to be available.
-        initializeMap();
-      };
-      
-      script.onerror = () => {
-        toast({ variant: 'destructive', title: '加载失败', description: '高德地图脚本加载失败，请检查网络或API Key' });
-        setIsApiLoading(false);
-      };
-      
-      document.head.appendChild(script);
-      
-      return () => {
-        // Clean up the script tag if the component unmounts before it loads.
-        document.head.removeChild(script);
-      };
-    }
+    
+    checkAMap();
     
     return () => {
-        if(mapRef.current) {
-            mapRef.current.destroy();
-            mapRef.current = null;
-            setMapInstance(null);
-        }
+      if(mapRef.current) {
+          mapRef.current.destroy();
+          mapRef.current = null;
+          setMapInstance(null);
+      }
     }
   }, [toast]);
 
@@ -142,7 +125,7 @@ const MapView = ({ photos, onMarkerClick }: MapViewProps) => {
 
   return (
     <div ref={mapContainerRef} className="w-full h-full">
-      {isApiLoading && (
+      {!mapInstance && (
          <div className="w-full h-full flex items-center justify-center bg-muted">
             <p className="text-muted-foreground">正在加载地图...</p>
          </div>
