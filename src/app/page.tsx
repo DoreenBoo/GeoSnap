@@ -21,7 +21,6 @@ export default function Home() {
   const [webServiceApiKey, setWebServiceApiKey] = useState('');
 
   useEffect(() => {
-    // Trim values to handle potential whitespace issues from copy-pasting
     const wsApiKey = process.env.NEXT_PUBLIC_AMAP_WEBSERVICE_API_KEY?.trim();
 
     if (wsApiKey) {
@@ -125,7 +124,6 @@ export default function Home() {
             const { isNew, ...photoToSave } = updatedPhoto;
             return photoToSave;
           }
-          // Also clear 'isNew' flag from any other photos
           return p.isNew ? { ...p, isNew: false } : p;
         });
     });
@@ -160,3 +158,5 @@ export default function Home() {
     </div>
   );
 }
+
+    

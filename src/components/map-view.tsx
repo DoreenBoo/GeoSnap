@@ -2,109 +2,151 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from '@vis.gl/react-google-maps';
 import type { Photo } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface MapViewProps {
   photos: Photo[];
   onMarkerClick: (photo: Photo) => void;
 }
 
-// Custom Marker Component
-const PhotoMarker = ({ photo, onClick }: { photo: Photo, onClick: () => void }) => {
-  return (
-    <AdvancedMarker
-      position={photo.location}
-      onClick={onClick}
-      title={photo.name}
-    >
-        <div style={{
-          position: 'relative',
-          width: '50px',
-          height: '50px',
-          background: 'white',
-          borderRadius: '50% 50% 50% 0',
-          transform: 'rotate(-45deg)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          cursor: 'pointer',
-        }}>
-          <img 
-            src={photo.src} 
-            alt={photo.name} 
-            style={{
-              width: '44px', 
-              height: '44px', 
-              borderRadius: '50%', 
-              objectFit: 'cover', 
-              transform: 'rotate(45deg)',
-              pointerEvents: 'none',
-            }} 
-          />
-        </div>
-    </AdvancedMarker>
-  );
+const PhotoMarker = ({ map, photo, onClick }: { map: any; photo: Photo; onClick: (photo: Photo) => void }) => {
+  const markerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!map || !window.AMap) return;
+
+    const el = document.createElement('div');
+    el.style.position = 'relative';
+    el.style.width = '50px';
+    el.style.height = '50px';
+    el.style.background = 'white';
+    el.style.borderRadius = '50% 50% 50% 0';
+    el.style.transform = 'rotate(-45deg)';
+    el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+    el.style.display = 'flex';
+    el.style.justifyContent = 'center';
+    el.style.alignItems = 'center';
+    el.style.cursor = 'pointer';
+
+    const img = document.createElement('img');
+    img.src = photo.src;
+    img.alt = photo.name;
+    img.style.width = '44px';
+    img.style.height = '44px';
+    img.style.borderRadius = '50%';
+    img.style.objectFit = 'cover';
+    img.style.transform = 'rotate(45deg)';
+    img.style.pointerEvents = 'none';
+
+    el.appendChild(img);
+
+    const marker = new window.AMap.Marker({
+      position: new window.AMap.LngLat(photo.location.lng, photo.location.lat),
+      content: el,
+      offset: new window.AMap.Pixel(-25, -50),
+      title: photo.name,
+    });
+    
+    marker.on('click', () => onClick(photo));
+    map.add(marker);
+    markerRef.current = marker;
+
+    return () => {
+      if (markerRef.current) {
+        map.remove(markerRef.current);
+      }
+    };
+  }, [map, photo, onClick]);
+
+  return null; 
 };
 
+
 const MapView = ({ photos, onMarkerClick }: MapViewProps) => {
-  const [apiKey, setApiKey] = useState('');
+  const mapRef = useRef<any>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+  const [mapInstance, setMapInstance] = useState<any>(null);
   const [center, setCenter] = useState({ lat: 39.9163, lng: 116.3972 });
   const [zoom, setZoom] = useState(5);
-  const mapRef = useRef<any>(null);
+  const [isApiLoaded, setIsApiLoaded] = useState(false);
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_AMAP_API_KEY;
-    if (key) {
-      setApiKey(key);
+    const apiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY;
+    if (!apiKey) {
+      toast({ variant: 'destructive', title: '配置缺失', description: '高德地图API Key未设置' });
+      return;
     }
-  }, []);
+
+    if (window.AMap) {
+        setIsApiLoaded(true);
+        return;
+    }
+    
+    const script = document.createElement('script');
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
+    script.async = true;
+    script.onload = () => {
+      setIsApiLoaded(true);
+    };
+    script.onerror = () => {
+      toast({ variant: 'destructive', title: '加载失败', description: '高德地图脚本加载失败，请检查网络或API Key' });
+    };
+    document.head.appendChild(script);
+
+  }, [toast]);
+
 
   useEffect(() => {
-    if (photos.length > 0) {
+    if (isApiLoaded && mapContainerRef.current && !mapInstance) {
+      const map = new window.AMap.Map(mapContainerRef.current, {
+        zoom: zoom,
+        center: [center.lng, center.lat],
+        viewMode: '2D',
+        dragEnable: true,
+        zoomEnable: true,
+      });
+      mapRef.current = map;
+      setMapInstance(map);
+    }
+    
+    return () => {
+        if(mapRef.current) {
+            mapRef.current.destroy();
+            setMapInstance(null);
+            mapRef.current = null;
+        }
+    }
+  }, [isApiLoaded, mapInstance, zoom, center.lng, center.lat]);
+
+  useEffect(() => {
+    if (mapInstance && photos.length > 0) {
       const lastPhoto = photos[photos.length - 1];
-       if (lastPhoto.isNew) {
-         setCenter(lastPhoto.location);
-         setZoom(12);
-       } else if (photos.length === 1) {
-         setCenter(photos[0].location);
-         setZoom(12);
-       }
+      if (lastPhoto.isNew) {
+        mapInstance.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
+        mapInstance.setZoom(12);
+      } else if (photos.length === 1) {
+        mapInstance.setCenter([photos[0].location.lng, photos[0].location.lat]);
+        mapInstance.setZoom(12);
+      }
     }
-  }, [photos]);
-
-
-  if (!apiKey) {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-muted">
-        <p className="text-muted-foreground">正在加载地图...</p>
-      </div>
-    );
-  }
+  }, [photos, mapInstance]);
 
   return (
-    <APIProvider apiKey={apiKey} version="2.0" solutionChannel="GMP_devsite_samples_v3_rgmautocomplete">
-      <Map
-        ref={mapRef}
-        mapId={'bf51a910020fa25a'}
-        zoom={zoom}
-        center={center}
-        gestureHandling={'greedy'}
-        disableDefaultUI={true}
-        className="w-full h-full"
-        mapType="amap"
-      >
-        {photos.map((photo) => (
-          <PhotoMarker 
-            key={photo.id} 
-            photo={photo}
-            onClick={() => onMarkerClick(photo)}
-          />
-        ))}
-      </Map>
-    </APIProvider>
+    <div ref={mapContainerRef} className="w-full h-full">
+      {!isApiLoaded && (
+         <div className="w-full h-full flex items-center justify-center bg-muted">
+            <p className="text-muted-foreground">正在加载地图...</p>
+         </div>
+      )}
+      {isApiLoaded && mapInstance && photos.map(photo => (
+        <PhotoMarker key={photo.id} map={mapInstance} photo={photo} onClick={onMarkerClick} />
+      ))}
+    </div>
   );
 };
 
 export default MapView;
+
+    
