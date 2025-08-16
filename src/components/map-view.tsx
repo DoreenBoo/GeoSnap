@@ -62,68 +62,75 @@ const PhotoMarker = ({ map, photo, onClick }: { map: any; photo: Photo; onClick:
   return null; 
 };
 
-
 const MapView = ({ photos, onMarkerClick }: MapViewProps) => {
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const [mapInstance, setMapInstance] = useState<any>(null);
-  const [center, setCenter] = useState({ lat: 39.9163, lng: 116.3972 });
-  const [zoom, setZoom] = useState(5);
-  const [isApiLoaded, setIsApiLoaded] = useState(false);
+  const [isApiLoading, setIsApiLoading] = useState(true);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_AMAP_API_KEY;
     if (!apiKey) {
       toast({ variant: 'destructive', title: '配置缺失', description: '高德地图API Key未设置' });
+      setIsApiLoading(false);
       return;
     }
 
+    const initializeMap = () => {
+      if (mapContainerRef.current && !mapRef.current) {
+        const map = new window.AMap.Map(mapContainerRef.current, {
+          zoom: 5,
+          center: [116.3972, 39.9163], // lng, lat
+          viewMode: '2D',
+          dragEnable: true,
+          zoomEnable: true,
+        });
+        mapRef.current = map;
+        setMapInstance(map);
+      }
+    };
+
     if (window.AMap) {
-        setIsApiLoaded(true);
-        return;
-    }
-    
-    const script = document.createElement('script');
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
-    script.async = true;
-    script.onload = () => {
-      setIsApiLoaded(true);
-    };
-    script.onerror = () => {
-      toast({ variant: 'destructive', title: '加载失败', description: '高德地图脚本加载失败，请检查网络或API Key' });
-    };
-    document.head.appendChild(script);
-
-  }, [toast]);
-
-
-  useEffect(() => {
-    if (isApiLoaded && mapContainerRef.current && !mapInstance) {
-      const map = new window.AMap.Map(mapContainerRef.current, {
-        zoom: zoom,
-        center: [center.lng, center.lat],
-        viewMode: '2D',
-        dragEnable: true,
-        zoomEnable: true,
-      });
-      mapRef.current = map;
-      setMapInstance(map);
+      setIsApiLoading(false);
+      initializeMap();
+    } else {
+      const script = document.createElement('script');
+      script.src = `https://webapi.amap.com/maps?v=2.0&key=${apiKey}`;
+      script.async = true;
+      
+      script.onload = () => {
+        setIsApiLoading(false);
+        // At this point, window.AMap is guaranteed to be available.
+        initializeMap();
+      };
+      
+      script.onerror = () => {
+        toast({ variant: 'destructive', title: '加载失败', description: '高德地图脚本加载失败，请检查网络或API Key' });
+        setIsApiLoading(false);
+      };
+      
+      document.head.appendChild(script);
+      
+      return () => {
+        // Clean up the script tag if the component unmounts before it loads.
+        document.head.removeChild(script);
+      };
     }
     
     return () => {
         if(mapRef.current) {
             mapRef.current.destroy();
-            setMapInstance(null);
             mapRef.current = null;
+            setMapInstance(null);
         }
     }
-  }, [isApiLoaded, mapInstance, zoom, center.lng, center.lat]);
+  }, [toast]);
 
   useEffect(() => {
     if (mapInstance && photos.length > 0) {
-      const lastPhoto = photos[photos.length - 1];
-      if (lastPhoto.isNew) {
+      const lastPhoto = photos.find(p => p.isNew);
+      if (lastPhoto) {
         mapInstance.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
         mapInstance.setZoom(12);
       } else if (photos.length === 1) {
@@ -135,12 +142,12 @@ const MapView = ({ photos, onMarkerClick }: MapViewProps) => {
 
   return (
     <div ref={mapContainerRef} className="w-full h-full">
-      {!isApiLoaded && (
+      {isApiLoading && (
          <div className="w-full h-full flex items-center justify-center bg-muted">
             <p className="text-muted-foreground">正在加载地图...</p>
          </div>
       )}
-      {isApiLoaded && mapInstance && photos.map(photo => (
+      {mapInstance && photos.map(photo => (
         <PhotoMarker key={photo.id} map={mapInstance} photo={photo} onClick={onMarkerClick} />
       ))}
     </div>
@@ -148,5 +155,3 @@ const MapView = ({ photos, onMarkerClick }: MapViewProps) => {
 };
 
 export default MapView;
-
-    
