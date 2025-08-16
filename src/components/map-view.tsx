@@ -1,169 +1,110 @@
 
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from '@vis.gl/react-google-maps';
 import type { Photo } from '@/lib/types';
-import { useToast } from '@/hooks/use-toast';
 
 interface MapViewProps {
   photos: Photo[];
   onMarkerClick: (photo: Photo) => void;
-  onMapReady: (isReady: boolean) => void;
 }
 
-const MapView = ({ photos, onMarkerClick, onMapReady }: MapViewProps) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    if (mapInstanceRef.current) {
-      return; // Map already initialized
-    }
-    
-    let isCancelled = false;
-    
-    const checkAmapReady = (callback: () => void) => {
-      if(isCancelled) return;
-      
-      if (window.AMap && window.AMap.Map) {
-        callback();
-      } else {
-        setTimeout(() => checkAmapReady(callback), 100);
-      }
-    };
-
-    const initMap = () => {
-      if (!mapRef.current) {
-        console.error("Map container is not available.");
-        onMapReady(false);
-        return;
-      }
-      
-      const center = [116.3972, 39.9163];
-
-      try {
-        const map = new window.AMap.Map(mapRef.current, {
-          zoom: 5,
-          center: center,
-          viewMode: '2D',
-        });
-        mapInstanceRef.current = map;
-
-        map.on('complete', () => {
-          if (!isCancelled) {
-            onMapReady(true);
-          }
-        });
-        
-        map.on('error', () => {
-          if (!isCancelled) {
-            toast({
-              variant: 'destructive',
-              title: '地图加载失败',
-              description: '高德地图实例创建失败，请检查API Key或网络。',
-            });
-            onMapReady(false);
-          }
-        });
-      } catch (e) {
-        console.error("Failed to initialize AMap:", e);
-        if (!isCancelled) {
-          toast({
-              variant: 'destructive',
-              title: '地图初始化错误',
-              description: '无法初始化地图组件，请检查浏览器控制台获取更多信息。',
-            });
-          onMapReady(false);
-        }
-      }
-    };
-
-    checkAmapReady(initMap);
-    
-    return () => {
-      isCancelled = true;
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.destroy();
-        mapInstanceRef.current = null;
-      }
-    };
-  }, [onMapReady, toast]); // Run only once on mount
-
-
-  useEffect(() => {
-    if (!mapInstanceRef.current || !window.AMap || !onMarkerClick) return;
-
-    // Clear existing markers
-    mapInstanceRef.current.remove(markersRef.current);
-    markersRef.current = [];
-
-    // Add new markers
-    photos.forEach(photo => {
-      const markerContent = `
-        <div style="
-          position: relative;
-          width: 50px;
-          height: 50px;
-          background: white;
-          border-radius: 50% 50% 50% 0;
-          transform: rotate(-45deg);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          cursor: pointer;
-        ">
+// Custom Marker Component
+const PhotoMarker = ({ photo, onClick }: { photo: Photo, onClick: () => void }) => {
+  return (
+    <AdvancedMarker
+      position={photo.location}
+      onClick={onClick}
+      title={photo.name}
+    >
+        <div style={{
+          position: 'relative',
+          width: '50px',
+          height: '50px',
+          background: 'white',
+          borderRadius: '50% 50% 50% 0',
+          transform: 'rotate(-45deg)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          cursor: 'pointer',
+        }}>
           <img 
-            src="${photo.src}" 
-            alt="${photo.name}" 
-            style="
-              width: 44px; 
-              height: 44px; 
-              border-radius: 50%; 
-              object-fit: cover; 
-              transform: rotate(45deg);
-              pointer-events: none;
-            " 
+            src={photo.src} 
+            alt={photo.name} 
+            style={{
+              width: '44px', 
+              height: '44px', 
+              borderRadius: '50%', 
+              objectFit: 'cover', 
+              transform: 'rotate(45deg)',
+              pointerEvents: 'none',
+            }} 
           />
         </div>
-      `;
-      
-      const marker = new window.AMap.Marker({
-        position: new window.AMap.LngLat(photo.location.lng, photo.location.lat),
-        content: markerContent,
-        offset: new window.AMap.Pixel(-25, -50), // Adjust offset to make the tip point to the location
-        title: photo.name,
-      });
+    </AdvancedMarker>
+  );
+};
 
-      marker.on('click', () => {
-        onMarkerClick(photo);
-        mapInstanceRef.current.setCenter([photo.location.lng, photo.location.lat]);
-      });
+const MapView = ({ photos, onMarkerClick }: MapViewProps) => {
+  const [apiKey, setApiKey] = useState('');
+  const [center, setCenter] = useState({ lat: 39.9163, lng: 116.3972 });
+  const [zoom, setZoom] = useState(5);
+  const mapRef = useRef<any>(null);
 
-      markersRef.current.push(marker);
-    });
-    
-    mapInstanceRef.current.add(markersRef.current);
-
-    if (photos.length > 0) {
-        const lastPhoto = photos[photos.length - 1];
-        if (lastPhoto.isNew) { // Only center on newly added photos
-          mapInstanceRef.current.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
-           if (mapInstanceRef.current.getZoom() < 12) {
-             mapInstanceRef.current.setZoom(12);
-           }
-        } else if (photos.length === 1) { // Center on the first photo if it's not new
-            mapInstanceRef.current.setCenter([lastPhoto.location.lng, lastPhoto.location.lat]);
-            mapInstanceRef.current.setZoom(12);
-        }
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_AMAP_API_KEY;
+    if (key) {
+      setApiKey(key);
     }
+  }, []);
 
-  }, [photos, onMarkerClick]);
+  useEffect(() => {
+    if (photos.length > 0) {
+      const lastPhoto = photos[photos.length - 1];
+       if (lastPhoto.isNew) {
+         setCenter(lastPhoto.location);
+         setZoom(12);
+       } else if (photos.length === 1) {
+         setCenter(photos[0].location);
+         setZoom(12);
+       }
+    }
+  }, [photos]);
 
 
-  return <div ref={mapRef} className="w-full h-full" />;
+  if (!apiKey) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">正在加载地图...</p>
+      </div>
+    );
+  }
+
+  return (
+    <APIProvider apiKey={apiKey} version="2.0" solutionChannel="GMP_devsite_samples_v3_rgmautocomplete">
+      <Map
+        ref={mapRef}
+        mapId={'bf51a910020fa25a'}
+        zoom={zoom}
+        center={center}
+        gestureHandling={'greedy'}
+        disableDefaultUI={true}
+        className="w-full h-full"
+        mapType="amap"
+      >
+        {photos.map((photo) => (
+          <PhotoMarker 
+            key={photo.id} 
+            photo={photo}
+            onClick={() => onMarkerClick(photo)}
+          />
+        ))}
+      </Map>
+    </APIProvider>
+  );
 };
 
 export default MapView;

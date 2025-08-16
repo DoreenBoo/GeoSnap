@@ -18,14 +18,13 @@ export default function Home() {
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isPhotoDialogOpen, setPhotoDialogOpen] = useState(false);
-  const [isMapReady, setMapReady] = useState(false);
   const [webServiceApiKey, setWebServiceApiKey] = useState('');
 
   useEffect(() => {
     // Trim values to handle potential whitespace issues from copy-pasting
     const wsApiKey = process.env.NEXT_PUBLIC_AMAP_WEBSERVICE_API_KEY?.trim();
 
-    if (wsApiKey && wsApiKey !== 'YOUR_WEBSERVICE_API_KEY_HERE') {
+    if (wsApiKey) {
       setWebServiceApiKey(wsApiKey);
     }
   }, []);
@@ -137,13 +136,11 @@ export default function Home() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
-      <MapView photos={photos} onMarkerClick={handleMarkerClick} onMapReady={setMapReady} />
+      <MapView photos={photos} onMarkerClick={handleMarkerClick} />
 
-      {isMapReady && (
-         <div className="absolute bottom-6 right-6 z-10">
-          <PhotoUploader onPhotosUploaded={handlePhotosUpload} isUploading={isUploading} />
-        </div>
-      )}
+       <div className="absolute bottom-6 right-6 z-10">
+        <PhotoUploader onPhotosUploaded={handlePhotosUpload} isUploading={isUploading} />
+      </div>
 
       <PhotoDialog
         photo={selectedPhoto}
