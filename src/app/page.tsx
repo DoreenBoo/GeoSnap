@@ -21,10 +21,11 @@ export default function Home() {
   const [webServiceApiKey, setWebServiceApiKey] = useState('');
 
   useEffect(() => {
-    const wsApiKey = process.env.NEXT_PUBLIC_AMAP_WEBSERVICE_API_KEY?.trim();
-
+    const wsApiKey = process.env.NEXT_PUBLIC_AMAP_WEBSERVICE_API_KEY;
     if (wsApiKey) {
       setWebServiceApiKey(wsApiKey);
+    } else {
+        console.warn("Web服务API Key未设置，逆地理编码将不可用。");
     }
   }, []);
 
@@ -158,5 +159,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
